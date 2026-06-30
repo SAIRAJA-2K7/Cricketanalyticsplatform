@@ -10,7 +10,7 @@ export function Footer() {
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
               <Flame className="w-5 h-5 text-white" />
             </div>
-            <span className="text-xl font-bold tracking-tighter">SRK</span>
+            <span className="text-xl font-bold tracking-tighter">crivora</span>
           </div>
           <p className="text-sm text-white/60 leading-relaxed">
             The ultimate destination for cricket fans. Real-time scores, in-depth analysis, and the latest news from the world of cricket.
@@ -56,7 +56,7 @@ export function Footer() {
         </div>
       </div>
       <div className="max-w-7xl mx-auto px-4 mt-12 pt-8 border-t border-white/10 text-center text-xs text-white/40">
-        &copy; 2026 SRK Sports Media. All rights reserved.
+        &copy; 2026 crivora. All rights reserved.
       </div>
     </footer>
   );

@@ -3,10 +3,12 @@ import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { api } from '../services/api.js';
+import { normalizeLiveMatch } from '../utils/matches.js';
 
 export function MatchDetail() {
   const { id } = useParams();
   const [activeTab, setActiveTab] = useState('info');
+  const [shareMessage, setShareMessage] = useState('');
 
   const { data: response, isLoading } = useQuery({
     queryKey: ['match', id],
@@ -15,21 +17,59 @@ export function MatchDetail() {
     refetchInterval: 60000, // Poll every minute
   });
 
+  const { data: scorecardResponse, isLoading: scorecardLoading } = useQuery({
+    queryKey: ['match-scorecard', id],
+    queryFn: () => api.getMatchScorecard(id),
+    enabled: !!id && activeTab === 'scorecard',
+    staleTime: 60000,
+  });
+
+  const { data: squadResponse, isLoading: squadLoading } = useQuery({
+    queryKey: ['match-squad', id],
+    queryFn: () => api.getMatchSquad(id),
+    enabled: !!id && activeTab === 'squads',
+    staleTime: 60000,
+  });
+
   if (isLoading) {
     return <div className="min-h-screen flex items-center justify-center">Loading match details...</div>;
   }
 
-  const match = response?.data;
+  const match = normalizeLiveMatch(response?.data);
 
   if (!match) {
     return <div className="min-h-screen flex items-center justify-center">Match not found</div>;
   }
 
-  const team1 = match.teamInfo?.[0] || { name: match.teams?.[0] || 'Team 1', shortname: 'T1' };
-  const team2 = match.teamInfo?.[1] || { name: match.teams?.[1] || 'Team 2', shortname: 'T2' };
-  
-  const score1 = match.score?.find(s => s.inning.includes(team1.name)) || { r: 0, w: 0, o: 0 };
-  const score2 = match.score?.find(s => s.inning.includes(team2.name)) || { r: 0, w: 0, o: 0 };
+  const team1 = match.teamInfo?.[0] || { name: match.team1?.name || 'Team 1', shortname: match.team1?.shortName || 'T1' };
+  const team2 = match.teamInfo?.[1] || { name: match.team2?.name || 'Team 2', shortname: match.team2?.shortName || 'T2' };
+
+  const score1 = match.score?.[0] || { r: 0, w: 0, o: 0 };
+  const score2 = match.score?.[1] || { r: 0, w: 0, o: 0 };
+  const scorecard = scorecardResponse?.data?.scoreCard || scorecardResponse?.data?.scorecard || [];
+  const squads = squadResponse?.data || [];
+
+  const handleShare = async () => {
+    const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: match.name, url: shareUrl });
+        setShareMessage('Match link shared.');
+        return;
+      }
+
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+        setShareMessage('Match link copied to clipboard.');
+        return;
+      }
+    } catch {
+      setShareMessage('Share was cancelled.');
+      return;
+    }
+
+    setShareMessage('Sharing is not available in this browser.');
+  };
 
   return (
     <>
@@ -50,12 +90,13 @@ export function MatchDetail() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button className="flex items-center gap-2 px-3 py-1.5 bg-primary rounded-lg text-xs font-bold hover:bg-primary/90 transition-all">
+            <button type="button" onClick={handleShare} className="flex items-center gap-2 px-3 py-1.5 bg-primary rounded-lg text-xs font-bold hover:bg-primary/90 transition-all">
               <Share2 className="w-3 h-3" />
               Share
             </button>
           </div>
         </div>
+        {shareMessage ? <p className="max-w-7xl mx-auto px-4 pb-3 text-[11px] text-white/70">{shareMessage}</p> : null}
       </div>
 
       {/* Match Summary Header */}
@@ -127,13 +168,77 @@ export function MatchDetail() {
       </div>
 
       <main className="flex-1 max-w-7xl mx-auto px-4 py-8 w-full grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {activeTab !== 'info' && (
+        {activeTab === 'scorecard' && (
           <section className="lg:col-span-12 bg-card border border-border rounded-2xl p-6">
-            <h3 className="text-lg font-bold capitalize mb-2">{activeTab}</h3>
-            <p className="text-sm text-muted-foreground">
-              {activeTab === 'scorecard' && 'Scorecard data can be expanded here using the /api/match/:id/scorecard endpoint.'}
-              {activeTab === 'squads' && 'Squads data can be expanded here using the /api/match/:id/squad endpoint.'}
-            </p>
+            <h3 className="text-lg font-bold capitalize mb-4">Scorecard</h3>
+            {scorecardLoading ? (
+              <p className="text-sm text-muted-foreground">Loading scorecard...</p>
+            ) : scorecard.length ? (
+              <div className="space-y-4">
+                {scorecard.map((innings, index) => (
+                  <article key={`${innings.innings || 'innings'}-${index}`} className="border border-border rounded-xl p-4">
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                      <h4 className="font-semibold">{innings.innings || `Innings ${index + 1}`}</h4>
+                      <span className="text-sm text-muted-foreground">
+                        {innings.score || `${innings.r || 0}/${innings.w || 0}`}
+                      </span>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-left text-muted-foreground border-b border-border">
+                            <th className="py-2 pr-3">Batter</th>
+                            <th className="py-2 pr-3">R</th>
+                            <th className="py-2 pr-3">B</th>
+                            <th className="py-2 pr-3">4s</th>
+                            <th className="py-2">6s</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(innings.batsman || innings.batting || []).map((player, playerIndex) => (
+                            <tr key={`${player.name || player.batsman || 'player'}-${playerIndex}`} className="border-b border-border/60 last:border-0">
+                              <td className="py-2 pr-3">{player.name || player.batsman || 'Unknown'}</td>
+                              <td className="py-2 pr-3">{player.r ?? player.runs ?? 0}</td>
+                              <td className="py-2 pr-3">{player.b ?? player.balls ?? 0}</td>
+                              <td className="py-2 pr-3">{player['4s'] ?? player.fours ?? 0}</td>
+                              <td className="py-2">{player['6s'] ?? player.sixes ?? 0}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Detailed scorecard data is not available for this match right now.</p>
+            )}
+          </section>
+        )}
+
+        {activeTab === 'squads' && (
+          <section className="lg:col-span-12 bg-card border border-border rounded-2xl p-6">
+            <h3 className="text-lg font-bold capitalize mb-4">Squads</h3>
+            {squadLoading ? (
+              <p className="text-sm text-muted-foreground">Loading squads...</p>
+            ) : squads.length ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {squads.map((team, index) => (
+                  <article key={`${team.teamName || team.name || 'team'}-${index}`} className="border border-border rounded-xl p-4">
+                    <h4 className="font-semibold mb-3">{team.teamName || team.name || `Team ${index + 1}`}</h4>
+                    <div className="space-y-2 text-sm">
+                      {(team.players || team.squad || []).map((player, playerIndex) => (
+                        <p key={`${player.name || player}-${playerIndex}`} className="border border-border/60 rounded-md px-3 py-2">
+                          {player.name || player}
+                        </p>
+                      ))}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Squad data is not available for this match right now.</p>
+            )}
           </section>
         )}
 

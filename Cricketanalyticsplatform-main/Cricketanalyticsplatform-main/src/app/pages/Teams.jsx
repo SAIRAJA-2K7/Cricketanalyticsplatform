@@ -2,6 +2,7 @@ import { Shield } from 'lucide-react';
 import { useMemo } from 'react';
 import { useLiveMatches } from '../hooks/useLiveMatches.js';
 import { upcomingMatches } from '../data/mockData.js';
+import { getTeamInitials, normalizeLiveMatch } from '../utils/matches.js';
 
 export function Teams() {
   const { matches } = useLiveMatches();
@@ -21,7 +22,8 @@ export function Teams() {
       }
     };
 
-    matches.forEach((m) => {
+    matches.forEach((rawMatch) => {
+      const m = normalizeLiveMatch(rawMatch);
       collect(m.team1);
       collect(m.team2);
       if (m.team1?.name && map.has(m.team1.name)) map.get(m.team1.name).liveMatches += 1;
@@ -50,7 +52,13 @@ export function Teams() {
         {teams.map((team) => (
           <article key={team.name} className="bg-card border border-border rounded-xl p-4 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
-              <img src={team.flag} alt={team.name} className="w-10 h-10 rounded-full border border-border object-cover" />
+              {team.flag ? (
+                <img src={team.flag} alt={team.name} className="w-10 h-10 rounded-full border border-border object-cover" />
+              ) : (
+                <div className="w-10 h-10 rounded-full border border-border bg-muted flex items-center justify-center text-xs font-semibold">
+                  {getTeamInitials(team.name)}
+                </div>
+              )}
               <div>
                 <h2 className="text-sm font-semibold truncate">{team.name}</h2>
                 <p className="text-xs text-muted-foreground">{team.shortName}</p>

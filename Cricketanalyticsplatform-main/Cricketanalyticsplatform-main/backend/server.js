@@ -5,6 +5,7 @@ const socketIo = require('socket.io');
 const { createClient } = require('redis');
 const cors = require('cors');
 const axios = require('axios');
+const mockData = require('./mockData');
 
 const app = express();
 const server = http.createServer(app);
@@ -19,12 +20,17 @@ app.use(cors());
 app.use(express.json());
 
 const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
-const redisClient = createClient({ url: redisUrl });
+const redisClient = createClient({
+  url: redisUrl,
+  socket: {
+    reconnectStrategy: false,
+  },
+});
 let redisReady = false;
 
 redisClient.on('error', (error) => {
   redisReady = false;
-  console.error('[redis] error', error.message);
+  console.log('[redis] unavailable, using memory cache only:', error.message);
 });
 
 redisClient.on('ready', () => {
@@ -34,7 +40,7 @@ redisClient.on('ready', () => {
 
 redisClient.connect().catch((error) => {
   redisReady = false;
-  console.error('[redis] unavailable, using memory cache only:', error.message);
+  console.log('[redis] unavailable, using memory cache only:', error.message);
 });
 
 const inMemoryCache = new Map();
@@ -109,101 +115,104 @@ const fetchCricAPI = async (endpoint, params = {}, cacheTtl) => {
   }
 };
 
-app.get('/api/current-matches', async (req, res) => {
-  const offset = req.query.offset || 0;
+const sendWithFallback = async (res, fetcher, fallbackFactory) => {
   try {
-    const data = await fetchCricAPI('/currentMatches', { offset }, CACHE_WINDOW.liveMs);
+    const data = await fetcher();
     res.json(data);
   } catch (error) {
-    res.status(500).json({ error: 'current_matches_failed', reason: error.message });
+    console.warn('[fallback] serving bundled data:', error.message);
+    res.json(fallbackFactory());
   }
+};
+
+app.get('/api/current-matches', async (req, res) => {
+  const offset = req.query.offset || 0;
+  await sendWithFallback(
+    res,
+    () => fetchCricAPI('/currentMatches', { offset }, CACHE_WINDOW.liveMs),
+    () => ({ status: 'success', data: mockData.liveMatches }),
+  );
 });
 
 app.get('/api/matches', async (req, res) => {
   const offset = req.query.offset || 0;
-  try {
-    const data = await fetchCricAPI('/matches', { offset }, CACHE_WINDOW.historicalMs);
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: 'matches_failed', reason: error.message });
-  }
+  await sendWithFallback(
+    res,
+    () => fetchCricAPI('/matches', { offset }, CACHE_WINDOW.historicalMs),
+    () => ({ status: 'success', data: mockData.matches }),
+  );
 });
 
 app.get('/api/series', async (req, res) => {
   const offset = req.query.offset || 0;
-  try {
-    const data = await fetchCricAPI('/series', { offset }, CACHE_WINDOW.historicalMs);
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: 'series_failed', reason: error.message });
-  }
+  await sendWithFallback(
+    res,
+    () => fetchCricAPI('/series', { offset }, CACHE_WINDOW.historicalMs),
+    () => ({ status: 'success', data: mockData.series }),
+  );
 });
 
 app.get('/api/series/:id', async (req, res) => {
-  try {
-    const data = await fetchCricAPI('/series_info', { id: req.params.id }, CACHE_WINDOW.historicalMs);
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: 'series_info_failed', reason: error.message });
-  }
+  await sendWithFallback(
+    res,
+    () => fetchCricAPI('/series_info', { id: req.params.id }, CACHE_WINDOW.historicalMs),
+    () => ({ status: 'success', data: mockData.seriesInfo[req.params.id] || mockData.seriesInfo.s1 }),
+  );
 });
 
 app.get('/api/match/:id', async (req, res) => {
-  try {
-    const data = await fetchCricAPI('/match_info', { id: req.params.id }, CACHE_WINDOW.liveMs);
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: 'match_info_failed', reason: error.message });
-  }
+  await sendWithFallback(
+    res,
+    () => fetchCricAPI('/match_info', { id: req.params.id }, CACHE_WINDOW.liveMs),
+    () => ({ status: 'success', data: mockData.matches.find((match) => match.id === req.params.id) || mockData.liveMatches[0] }),
+  );
 });
 
 app.get('/api/match/:id/scorecard', async (req, res) => {
-  try {
-    const data = await fetchCricAPI('/match_scorecard', { id: req.params.id }, CACHE_WINDOW.liveMs);
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: 'match_scorecard_failed', reason: error.message });
-  }
+  await sendWithFallback(
+    res,
+    () => fetchCricAPI('/match_scorecard', { id: req.params.id }, CACHE_WINDOW.liveMs),
+    () => ({ status: 'success', data: mockData.scorecards[req.params.id] || { scoreCard: [] } }),
+  );
 });
 
 app.get('/api/match/:id/squad', async (req, res) => {
-  try {
-    const data = await fetchCricAPI('/match_squad', { id: req.params.id }, CACHE_WINDOW.historicalMs);
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: 'match_squad_failed', reason: error.message });
-  }
+  await sendWithFallback(
+    res,
+    () => fetchCricAPI('/match_squad', { id: req.params.id }, CACHE_WINDOW.historicalMs),
+    () => ({ status: 'success', data: mockData.squads[req.params.id] || [] }),
+  );
 });
 
 app.get('/api/players', async (req, res) => {
   const { offset = 0, search = '' } = req.query;
   const params = { offset };
   if (search) params.search = search;
-  try {
-    const data = await fetchCricAPI('/players', params, CACHE_WINDOW.historicalMs);
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: 'players_failed', reason: error.message });
-  }
+  await sendWithFallback(
+    res,
+    () => fetchCricAPI('/players', params, CACHE_WINDOW.historicalMs),
+    () => ({
+      status: 'success',
+      data: mockData.players.filter((player) => player.name.toLowerCase().includes(String(search).toLowerCase())),
+    }),
+  );
 });
 
 app.get('/api/player/:id', async (req, res) => {
-  try {
-    const data = await fetchCricAPI('/players_info', { id: req.params.id }, CACHE_WINDOW.historicalMs);
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: 'players_info_failed', reason: error.message });
-  }
+  await sendWithFallback(
+    res,
+    () => fetchCricAPI('/players_info', { id: req.params.id }, CACHE_WINDOW.historicalMs),
+    () => ({ status: 'success', data: mockData.playerInfo[req.params.id] || mockData.playerInfo.p1 }),
+  );
 });
 
 app.get('/api/countries', async (req, res) => {
   const offset = req.query.offset || 0;
-  try {
-    const data = await fetchCricAPI('/countries', { offset }, CACHE_WINDOW.historicalMs);
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: 'countries_failed', reason: error.message });
-  }
+  await sendWithFallback(
+    res,
+    () => fetchCricAPI('/countries', { offset }, CACHE_WINDOW.historicalMs),
+    () => ({ status: 'success', data: mockData.countries }),
+  );
 });
 
 io.on('connection', (socket) => {

@@ -1,11 +1,13 @@
 {
-  "name": "@figma/my-make-file",
+  "name": "crivora",
   "private": true,
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "build": "vite build",
-    "dev": "vite"
+    "build": "vite build --configLoader runner",
+    "build:pages": "vite build --configLoader runner --base=/Cricketanalyticsplatform/",
+    "dev": "vite --configLoader runner",
+    "preview": "vite preview --host 127.0.0.1 --port 4173 --configLoader runner"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",

@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { HashRouter, Routes, Route } from 'react-router-dom';
 import { Navbar } from './components/layout/Navbar.jsx';
 import { LiveTicker } from './components/layout/LiveTicker.jsx';
 import { Footer } from './components/layout/Footer.jsx';
@@ -17,7 +17,7 @@ import { CountriesList } from './pages/CountriesList.jsx';
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <div className="min-h-screen w-full bg-background flex flex-col relative">
         <Navbar />
         <LiveTicker />
@@ -37,6 +37,6 @@ export default function App() {
         <Footer />
         <MobileNav />
       </div>
-    </BrowserRouter>
+    </HashRouter>
   );
 }

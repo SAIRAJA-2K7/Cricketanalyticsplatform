@@ -25,6 +25,7 @@ import { CommentaryFeed } from '../components/live/CommentaryFeed.jsx';
 import { MomentumPanel } from '../components/live/MomentumPanel.jsx';
 import { useLiveMatches } from '../hooks/useLiveMatches.js';
 import { useWatchlist } from '../hooks/useWatchlist.js';
+import { normalizeLiveMatch } from '../utils/matches.js';
 
 function SidebarCard({ title, icon: Icon, children, compact = false }) {
   return (
@@ -197,16 +198,19 @@ export function Home() {
             <div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">Loading live match engine...</div>
           ) : (
             <div className="space-y-4">
-              {matches.map((match) => (
+          {matches.map((rawMatch) => {
+            const match = normalizeLiveMatch(rawMatch);
+            return (
                 <MatchCenterCard
                   key={match.id}
                   match={match}
                   pinned={pinnedMatches.includes(match.id)}
-                  watching={isWatching('teams', match.teamInfo?.[0]?.name || match.teams?.[0])}
+                  watching={isWatching('teams', match.team1?.name || match.teamInfo?.[0]?.name)}
                   onTogglePin={togglePin}
                   onToggleWatch={(teamName) => toggleItem('teams', teamName)}
                 />
-              ))}
+            );
+          })}
             </div>
           )}
 

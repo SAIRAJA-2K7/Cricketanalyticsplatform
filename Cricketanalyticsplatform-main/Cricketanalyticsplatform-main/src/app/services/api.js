@@ -1,4 +1,6 @@
-const API_BASE = 'http://localhost:3003/api';
+import { mockApi } from './mockApi.js';
+
+const API_BASE = import.meta.env.VITE_API_BASE || '/api';
 
 const safeFetch = async (path, params = {}) => {
   try {
@@ -11,19 +13,19 @@ const safeFetch = async (path, params = {}) => {
     return response.json();
   } catch (error) {
     console.error(`[API Fetch Error] ${path}:`, error.message);
-    throw error;
+    return null;
   }
 };
 
 export const api = {
-  getCurrentMatches: async (offset = 0) => safeFetch('/current-matches', { offset }),
-  getMatches: async (offset = 0) => safeFetch('/matches', { offset }),
-  getSeries: async (offset = 0) => safeFetch('/series', { offset }),
-  getSeriesInfo: async (id) => safeFetch(`/series/${id}`),
-  getMatchInfo: async (id) => safeFetch(`/match/${id}`),
-  getMatchScorecard: async (id) => safeFetch(`/match/${id}/scorecard`),
-  getMatchSquad: async (id) => safeFetch(`/match/${id}/squad`),
-  getPlayers: async (offset = 0, search = '') => safeFetch('/players', { offset, search }),
-  getPlayerInfo: async (id) => safeFetch(`/player/${id}`),
-  getCountries: async (offset = 0) => safeFetch('/countries', { offset }),
+  getCurrentMatches: async (offset = 0) => (await safeFetch('/current-matches', { offset })) || mockApi.getCurrentMatches(offset),
+  getMatches: async (offset = 0) => (await safeFetch('/matches', { offset })) || mockApi.getMatches(offset),
+  getSeries: async (offset = 0) => (await safeFetch('/series', { offset })) || mockApi.getSeries(offset),
+  getSeriesInfo: async (id) => (await safeFetch(`/series/${id}`)) || mockApi.getSeriesInfo(id),
+  getMatchInfo: async (id) => (await safeFetch(`/match/${id}`)) || mockApi.getMatchInfo(id),
+  getMatchScorecard: async (id) => (await safeFetch(`/match/${id}/scorecard`)) || mockApi.getMatchScorecard(id),
+  getMatchSquad: async (id) => (await safeFetch(`/match/${id}/squad`)) || mockApi.getMatchSquad(id),
+  getPlayers: async (offset = 0, search = '') => (await safeFetch('/players', { offset, search })) || mockApi.getPlayers(offset, search),
+  getPlayerInfo: async (id) => (await safeFetch(`/player/${id}`)) || mockApi.getPlayerInfo(id),
+  getCountries: async (offset = 0) => (await safeFetch('/countries', { offset })) || mockApi.getCountries(offset),
 };

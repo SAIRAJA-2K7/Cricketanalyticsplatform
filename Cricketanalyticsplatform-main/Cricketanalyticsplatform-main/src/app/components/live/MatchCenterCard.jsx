@@ -1,5 +1,6 @@
 import { Bell, Pin, TrendingUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { normalizeLiveMatch } from '../../utils/matches.js';
 
 const eventTone = {
   W: 'bg-destructive/15 text-destructive border-destructive/30',
@@ -20,23 +21,24 @@ function BallBadge({ value }) {
 }
 
 export function MatchCenterCard({ match, pinned, watching, onTogglePin, onToggleWatch }) {
-  if (!match) return null;
+  const normalizedMatch = normalizeLiveMatch(match);
+  if (!normalizedMatch) return null;
 
-  const team1Info = match.teamInfo?.[0] || { name: match.teams?.[0] || 'Team 1', shortname: 'T1' };
-  const team2Info = match.teamInfo?.[1] || { name: match.teams?.[1] || 'Team 2', shortname: 'T2' };
+  const team1Info = normalizedMatch.teamInfo[0];
+  const team2Info = normalizedMatch.teamInfo[1];
 
-  const team1Score = match.score?.find(s => s.inning.includes(team1Info.name)) || { r: 0, w: 0, o: 0 };
-  const team2Score = match.score?.find(s => s.inning.includes(team2Info.name)) || { r: 0, w: 0, o: 0 };
+  const team1Score = normalizedMatch.score[0] || { r: 0, w: 0, o: 0 };
+  const team2Score = normalizedMatch.score[1] || { r: 0, w: 0, o: 0 };
 
-  const tossText = match.tossWinner ? `${match.tossWinner} elected to ${match.tossChoice}` : 'Toss Info Unavailable';
+  const tossText = normalizedMatch.tossWinner ? `${normalizedMatch.tossWinner} elected to ${normalizedMatch.tossChoice}` : 'Toss Info Unavailable';
 
   return (
     <article className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
       <header className="px-4 py-3 border-b border-border bg-muted/40 flex items-center justify-between gap-3">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">{match.matchType || 'Match'}</p>
-          <h3 className="text-sm font-semibold leading-tight truncate max-w-[200px]">{match.name}</h3>
-          <p className="text-[11px] text-muted-foreground mt-0.5 truncate max-w-[200px]">{match.venue}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">{normalizedMatch.matchType || 'Match'}</p>
+          <h3 className="text-sm font-semibold leading-tight truncate max-w-[200px]">{normalizedMatch.name}</h3>
+          <p className="text-[11px] text-muted-foreground mt-0.5 truncate max-w-[200px]">{normalizedMatch.venue}</p>
         </div>
         <div className="text-right">
           <p className="text-[11px] font-semibold text-foreground">{tossText}</p>
@@ -47,9 +49,9 @@ export function MatchCenterCard({ match, pinned, watching, onTogglePin, onToggle
         <div className="grid grid-cols-[1fr_auto] gap-2 items-center">
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="font-semibold text-sm">{team1Info.shortname}</span>
-              <span className="text-xl leading-none tabular-nums font-semibold">{team1Score.r}/{team1Score.w}</span>
-            </div>
+                <span className="font-semibold text-sm">{team1Info.shortname}</span>
+                <span className="text-xl leading-none tabular-nums font-semibold">{team1Score.r}/{team1Score.w}</span>
+              </div>
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>{team1Info.name}</span>
               <span>{team1Score.o} ov</span>
@@ -61,19 +63,19 @@ export function MatchCenterCard({ match, pinned, watching, onTogglePin, onToggle
           </div>
         </div>
 
-        <p className="text-xs text-muted-foreground font-medium">{match.status}</p>
+        <p className="text-xs text-muted-foreground font-medium">{normalizedMatch.status}</p>
       </div>
 
       <footer className="px-4 py-3 border-t border-border bg-muted/30 flex items-center gap-2">
         <Link
-          to={`/match/${match.id}`}
+          to={`/match/${normalizedMatch.id}`}
           className="flex-1 rounded-md bg-secondary text-secondary-foreground text-xs font-semibold h-9 inline-flex items-center justify-center"
         >
           Open Match Center
         </Link>
         <button
           type="button"
-          onClick={() => onTogglePin(match.id)}
+          onClick={() => onTogglePin(normalizedMatch.id)}
           className={`h-9 px-3 rounded-md border text-xs font-semibold inline-flex items-center gap-1 ${
             pinned ? 'border-primary text-primary bg-primary/10' : 'border-border'
           }`}

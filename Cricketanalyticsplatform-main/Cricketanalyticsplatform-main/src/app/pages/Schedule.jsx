@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { CalendarClock } from 'lucide-react';
 import { useLiveMatches } from '../hooks/useLiveMatches.js';
 import { upcomingMatches } from '../data/mockData.js';
+import { normalizeLiveMatch } from '../utils/matches.js';
 
 export function Schedule() {
   const { matches } = useLiveMatches();
@@ -19,7 +20,9 @@ export function Schedule() {
       <section className="bg-card border border-border rounded-xl p-4">
         <h2 className="text-sm font-semibold mb-3">Live Now</h2>
         <div className="space-y-2">
-          {matches.map((match) => (
+          {matches.map((rawMatch) => {
+            const match = normalizeLiveMatch(rawMatch);
+            return (
             <Link
               key={match.id}
               to={`/match/${match.id}`}
@@ -34,7 +37,8 @@ export function Schedule() {
                 <p className="text-xs text-muted-foreground">{match.matchInfo}</p>
               </div>
             </Link>
-          ))}
+            );
+          })}
           {!matches.length && <p className="text-sm text-muted-foreground">No live fixtures at this time.</p>}
         </div>
       </section>
